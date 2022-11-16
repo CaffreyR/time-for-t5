@@ -580,8 +580,14 @@ class GenerationMixin:
         model_input_name = model_input_name if model_input_name is not None else self.main_input_name
         encoder_kwargs["return_dict"] = True
         encoder_kwargs[model_input_name] = inputs_tensor
+        import time
+        import torch
+        torch.cuda.synchronize()
+        start = time.perf_counter()
         model_kwargs["encoder_outputs"]: ModelOutput = encoder(**encoder_kwargs)
-
+        torch.cuda.synchronize()
+        end = time.perf_counter()
+        print("Before Greedy search",end-start)
         return model_kwargs
 
     def _prepare_decoder_input_ids_for_generation(

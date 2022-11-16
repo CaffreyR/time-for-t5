@@ -1604,9 +1604,12 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
             if self.config.num_layers == self.config.num_decoder_layers:
                 warnings.warn(__HEAD_MASK_WARNING_MSG, FutureWarning)
                 decoder_head_mask = head_mask
-
+        import time
+        #print("Encoder outputs:",encoder_outputs)
         # Encode if needed (training, first prediction pass)
         if encoder_outputs is None:
+            torch.cuda.synchronize()
+            start = time.perf_counter()
             # Convert encoder inputs in embeddings if needed
             encoder_outputs = self.encoder(
                 input_ids=input_ids,
@@ -1617,12 +1620,20 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
             )
+            torch.cuda.synchronize()
+            end = time.perf_counter()
+            print("Run self.encoder: ",end-start)
         elif return_dict and not isinstance(encoder_outputs, BaseModelOutput):
+            torch.cuda.synchronize()
+            start = time.perf_counter()
             encoder_outputs = BaseModelOutput(
                 last_hidden_state=encoder_outputs[0],
                 hidden_states=encoder_outputs[1] if len(encoder_outputs) > 1 else None,
                 attentions=encoder_outputs[2] if len(encoder_outputs) > 2 else None,
             )
+            torch.cuda.synchronize()
+            end = time.perf_counter()
+            print("Not run self.encoder: ",end-start)
 
         hidden_states = encoder_outputs[0]
 
@@ -1644,6 +1655,8 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
             if decoder_attention_mask is not None:
                 decoder_attention_mask = decoder_attention_mask.to(self.decoder.first_device)
 
+        torch.cuda.synchronize()
+        start = time.perf_counter()
         # Decode
         decoder_outputs = self.decoder(
             input_ids=decoder_input_ids,
@@ -1659,7 +1672,9 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-
+        torch.cuda.synchronize()
+        end = time.perf_counter()
+        print("Decoder:", end-start)
         sequence_output = decoder_outputs[0]
 
         # Set device for model parallelism
